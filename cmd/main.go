@@ -8,8 +8,9 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/fang"
-	"github.com/spf13/cobra"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/mzkux/AutoFlow/executors"
+	"github.com/spf13/cobra"
 )
 
 type Executor struct {
@@ -17,6 +18,12 @@ type Executor struct {
 	cursor   int
 	selected int
 }
+
+var (
+	titleStyle    = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#FC8FF6")).Bold(true)
+	selectedStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#FC8FF6")).Bold(true)
+	normalStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#D1CAD1"))
+)
 
 var (
 	version = "dev"
@@ -31,7 +38,7 @@ var rootCmd = &cobra.Command{
 	Long:  `autoflow is a CI/CD automation tool...`,
 	Run: func(cmd *cobra.Command, args []string) {
 		p := tea.NewProgram(initialModel())
-		m, err := p.Run(); 
+		m, err := p.Run()
 		if err != nil {
 			fmt.Printf("Alas, there's been an error: %v", err)
 			os.Exit(1)
@@ -71,7 +78,11 @@ var listCmd = &cobra.Command{
 
 func initialModel() Executor {
 	return Executor{
-		choices:  []string{"Github", "Gitlab", "Azure Devops"},
+		choices: []string{
+			lipgloss.NewStyle().Foreground(lipgloss.Color("#A855F7")).Render("Github"),
+			lipgloss.NewStyle().Foreground(lipgloss.Color("#F97316")).Render("Gitlab"),
+			lipgloss.NewStyle().Foreground(lipgloss.Color("#3B82F6")).Render("Azure Devops"),
+		},
 		selected: -1,
 	}
 }
@@ -103,7 +114,8 @@ func (m Executor) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m Executor) View() string {
-	s := "What Executor Would You Like To Use?\n\n"
+	var content string
+	content = titleStyle.Render("What Executor Would You Like To Use?") + "\n"
 	for i, choice := range m.choices {
 		cursor := " "
 		if m.cursor == i {
@@ -113,10 +125,15 @@ func (m Executor) View() string {
 		if m.selected == i {
 			checked = "x"
 		}
-		s += fmt.Sprintf("%s [%s] %s\n", cursor, checked, choice)
+		s := fmt.Sprintf("%s [%s] %s", cursor, checked, choice)
+		if m.cursor == i {
+			content += selectedStyle.Render(s) + "\n"
+		} else {
+			content += normalStyle.Render(s) + "\n"
+		}
 	}
-	s += "\nPress q to quit.\n"
-	return s
+	content += "\nPress q to quit.\n"
+	return content
 }
 
 func main() {

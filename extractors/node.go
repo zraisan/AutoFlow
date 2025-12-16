@@ -6,6 +6,8 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -14,8 +16,13 @@ type NodeScripts struct {
 }
 
 type Directory struct {
-	value string
+	value textinput.Model
+	err   error
 }
+
+type (
+	errMsg error
+)
 
 func ReadFiles(path string) string {
 	entries, err := os.ReadDir(path)
@@ -46,57 +53,63 @@ func ReadFiles(path string) string {
 }
 
 func initialModel() Directory {
+	ti := textinput.New()
+	ti.Placeholder = "./"
+	ti.Focus()
+	ti.CharLimit = 156
+	ti.Width = 20
+
 	return Directory{
-		value: "",
+		value: ti,
+		err:   nil,
 	}
 }
 
 func (m Directory) Init() tea.Cmd {
-	return nil
+	return textinput.Blink
 }
 
-
 func (m Directory) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		switch msg.String() {
-			case "enter":
-				return m, tea.Quit
-			case "ctrl+c":
-				return m, tea.Quit
-			case "backspace":
-				if len(m.value) > 0 {
-					m.value = m.value[:len(m.value)-1]
-				}
-			case "space":
-				m.value += " "
-			default:
-				m.value += msg.String()
+		switch msg.Type {
+		case tea.KeyEnter, tea.KeyCtrlC, tea.KeyEsc:
+			return m, tea.Quit
 		}
+
+	// We handle errors just like any other message
+	case errMsg:
+		m.err = msg
+		return m, nil
 	}
-	return m, nil
+
+	m.value, cmd = m.value.Update(msg)
+	return m, cmd
 }
 
 func (m Directory) View() string {
-	s := "Provide the target path (./)? "
-
-	s += fmt.Sprintf("%s\n", m.value)
-
-	s += "\nPress ctrl+c to quit.\n"
-
-	return s
+	msg := fmt.Sprintf("Project Directory: %s", m.value.View())
+	entries, _ := os.ReadDir(m.value.Value())
+	for _, entry := range entries {
+		if entry.IsDir() {
+			msg += fmt.Sprintf("\n%s", entry.Name())
+		}
+	}
+	return msg
 }
 
 func NodeExtract() {
 	p := tea.NewProgram(initialModel())
-	m, err := p.Run(); 
+	m, err := p.Run()
 	if err != nil {
 		fmt.Printf("Alas, there's been an error: %v", err)
 		os.Exit(1)
 	}
 	if directory, ok := m.(Directory); ok {
-		result := ReadFiles(directory.value)
+		result := ReadFiles(directory.value.Value())
 		fmt.Println("Result:", result)
 	}
-	return 
+	return
 }
