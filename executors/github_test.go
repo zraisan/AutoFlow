@@ -4,19 +4,26 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mzkux/AutoFlow/extractors"
 	"gopkg.in/yaml.v3"
 )
 
-func TestWriteYaml(t *testing.T) {
-	result := WriteYaml("")
+func TestWriteGithubYaml(t *testing.T) {
+	scripts := extractors.Scripts{
+		Install: "npm install",
+		Lint:    "npm run lint",
+		Build:   "npm run build",
+		Test:    "npm run test",
+	}
+	result := WriteGithubYaml(scripts)
 
 	if result == "" {
-		t.Fatal("WriteYaml returned empty string")
+		t.Fatal("WriteGithubYaml returned empty string")
 	}
 
-	var workflow Workflow
+	var workflow GithubWorkflow
 	if err := yaml.Unmarshal([]byte(result), &workflow); err != nil {
-		t.Fatalf("WriteYaml produced invalid YAML: %v", err)
+		t.Fatalf("WriteGithubYaml produced invalid YAML: %v", err)
 	}
 
 	if workflow.Name != "test" {
@@ -39,20 +46,26 @@ func TestWriteYaml(t *testing.T) {
 		t.Errorf("expected runs-on 'ubuntu-latest', got '%s'", job.RunsOn)
 	}
 
-	if len(job.Steps) != 3 {
-		t.Errorf("expected 3 steps, got %d", len(job.Steps))
+	if len(job.Steps) != 6 {
+		t.Errorf("expected 6 steps, got %d", len(job.Steps))
 	}
 }
 
-func TestWriteYamlContainsExpectedStrings(t *testing.T) {
-	result := WriteYaml("")
+func TestWriteGithubYamlContainsExpectedStrings(t *testing.T) {
+	scripts := extractors.Scripts{
+		Install: "npm install",
+		Lint:    "npm run lint",
+		Build:   "npm run build",
+		Test:    "npm run test",
+	}
+	result := WriteGithubYaml(scripts)
 
 	expectedStrings := []string{
 		"name: test",
 		"runs-on: ubuntu-latest",
 		"actions/checkout@v4",
 		"npm install",
-		"npm test",
+		"npm run test",
 	}
 
 	for _, expected := range expectedStrings {
@@ -62,18 +75,18 @@ func TestWriteYamlContainsExpectedStrings(t *testing.T) {
 	}
 }
 
-func TestWorkflowStructMarshal(t *testing.T) {
-	w := Workflow{
+func TestGithubWorkflowStructMarshal(t *testing.T) {
+	w := GithubWorkflow{
 		Name: "custom",
-		On: On{
-			PullRequest: &PullRequestEvent{
+		On: GithubOn{
+			PullRequest: &GithubPullRequestEvent{
 				Branches: []string{"develop", "main"},
 			},
 		},
-		Jobs: map[string]Job{
+		Jobs: map[string]GithubJob{
 			"test": {
 				RunsOn: "ubuntu-22.04",
-				Steps: []Step{
+				Steps: []GithubStep{
 					{Name: "Run tests", Run: "go test ./..."},
 				},
 			},
@@ -85,7 +98,7 @@ func TestWorkflowStructMarshal(t *testing.T) {
 		t.Fatalf("failed to marshal: %v", err)
 	}
 
-	var got Workflow
+	var got GithubWorkflow
 	if err := yaml.Unmarshal(data, &got); err != nil {
 		t.Fatalf("failed to unmarshal: %v", err)
 	}

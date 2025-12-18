@@ -1,22 +1,16 @@
 package extractors
 
 import (
-	"strings"
 	"testing"
 )
 
 func TestReadFile(t *testing.T) {
-	result := readFiles("../data/node")
-
-	if result == "" {
-		t.Fatal("returned empty string")
+	scripts, err := ReadNodeFiles("../data/node")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if !strings.HasPrefix(strings.TrimSpace(result), "{") {
-		t.Errorf("expected JSON object, got %q", result)
-	}
-
-	if !strings.Contains(result, "name") {
-		t.Error("expected package.json to contain 'name' field")
+	if scripts.Install != "npm install" {
+		t.Errorf("expected Install to be 'npm install', got %q", scripts.Install)
 	}
 }

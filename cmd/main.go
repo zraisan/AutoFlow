@@ -23,6 +23,11 @@ var (
 	titleStyle    = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#FC8FF6")).Bold(true)
 	selectedStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#FC8FF6")).Bold(true)
 	normalStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#D1CAD1"))
+	choiceStyles  = map[string]lipgloss.Style{
+		"Github":       lipgloss.NewStyle().Foreground(lipgloss.Color("#A855F7")),
+		"Gitlab":       lipgloss.NewStyle().Foreground(lipgloss.Color("#F97316")),
+		"Azure Devops": lipgloss.NewStyle().Foreground(lipgloss.Color("#3B82F6")),
+	}
 )
 
 var (
@@ -44,18 +49,7 @@ var rootCmd = &cobra.Command{
 			os.Exit(1)
 		}
 		if executorModel, ok := m.(Executor); ok {
-			switch executorModel.selected {
-			case 0:
-				executors.GithubExecute()
-
-			case 1:
-				fmt.Println("Gitlab executor selected")
-			case 2:
-				fmt.Println("Azure Devops executor selected")
-			default:
-				fmt.Println("No executor selected")
-				return
-			}
+			executors.Execute(executorModel.choices[executorModel.selected])
 		}
 	},
 }
@@ -78,17 +72,13 @@ var listCmd = &cobra.Command{
 
 func initialModel() Executor {
 	return Executor{
-		choices: []string{
-			lipgloss.NewStyle().Foreground(lipgloss.Color("#A855F7")).Render("Github"),
-			lipgloss.NewStyle().Foreground(lipgloss.Color("#F97316")).Render("Gitlab"),
-			lipgloss.NewStyle().Foreground(lipgloss.Color("#3B82F6")).Render("Azure Devops"),
-		},
+		choices:  []string{"Github", "Gitlab", "Azure Devops"},
 		selected: -1,
 	}
 }
 
 func (m Executor) Init() tea.Cmd {
-	return nil
+	return tea.EnterAltScreen
 }
 
 func (m Executor) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -117,6 +107,7 @@ func (m Executor) View() string {
 	var content string
 	content = titleStyle.Render("What Executor Would You Like To Use?") + "\n"
 	for i, choice := range m.choices {
+		
 		cursor := " "
 		if m.cursor == i {
 			cursor = ">"
@@ -125,7 +116,11 @@ func (m Executor) View() string {
 		if m.selected == i {
 			checked = "x"
 		}
-		s := fmt.Sprintf("%s [%s] %s", cursor, checked, choice)
+		styledChoice := choice
+		if style, ok := choiceStyles[choice]; ok {
+			styledChoice = style.Render(choice)
+		}
+		s := fmt.Sprintf("%s [%s] %s", cursor, checked, styledChoice)
 		if m.cursor == i {
 			content += selectedStyle.Render(s) + "\n"
 		} else {
