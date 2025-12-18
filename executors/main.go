@@ -22,7 +22,7 @@ func initialModel() Extractor {
 }
 
 func (m Extractor) Init() tea.Cmd {
-	return tea.EnterAltScreen
+	return nil
 }
 
 func (m Extractor) Update(msg tea.Msg) (tea.Model, tea.Cmd) {

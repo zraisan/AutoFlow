@@ -42,7 +42,7 @@ var rootCmd = &cobra.Command{
 	Short: "A workflow generator",
 	Long:  `autoflow is a CI/CD automation tool...`,
 	Run: func(cmd *cobra.Command, args []string) {
-		p := tea.NewProgram(initialModel())
+		p := tea.NewProgram(initialModel(), tea.WithAltScreen())
 		m, err := p.Run()
 		if err != nil {
 			fmt.Printf("Alas, there's been an error: %v", err)
@@ -78,7 +78,7 @@ func initialModel() Executor {
 }
 
 func (m Executor) Init() tea.Cmd {
-	return tea.EnterAltScreen
+	return nil
 }
 
 func (m Executor) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -107,7 +107,7 @@ func (m Executor) View() string {
 	var content string
 	content = titleStyle.Render("What Executor Would You Like To Use?") + "\n"
 	for i, choice := range m.choices {
-		
+
 		cursor := " "
 		if m.cursor == i {
 			cursor = ">"
