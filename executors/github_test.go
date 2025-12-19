@@ -4,18 +4,19 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mzkux/AutoFlow/extractors"
+	"github.com/mzkux/AutoFlow/types"
 	"gopkg.in/yaml.v3"
 )
 
 func TestWriteGithubYaml(t *testing.T) {
-	scripts := extractors.Scripts{
+	scripts := types.Scripts{
 		Install: "npm install",
 		Lint:    "npm run lint",
 		Build:   "npm run build",
 		Test:    "npm run test",
 	}
-	result := WriteGithubYaml(scripts)
+	tmpDir := t.TempDir()
+	result := WriteGithubYaml(scripts, tmpDir)
 
 	if result == "" {
 		t.Fatal("WriteGithubYaml returned empty string")
@@ -52,13 +53,14 @@ func TestWriteGithubYaml(t *testing.T) {
 }
 
 func TestWriteGithubYamlContainsExpectedStrings(t *testing.T) {
-	scripts := extractors.Scripts{
+	scripts := types.Scripts{
 		Install: "npm install",
 		Lint:    "npm run lint",
 		Build:   "npm run build",
 		Test:    "npm run test",
 	}
-	result := WriteGithubYaml(scripts)
+	tmpDir := t.TempDir()
+	result := WriteGithubYaml(scripts, tmpDir)
 
 	expectedStrings := []string{
 		"name: test",

@@ -6,28 +6,30 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/mzkux/AutoFlow/types"
 )
 
 type nodeScripts struct {
 	Scripts map[string]string `json:"scripts"`
 }
 
-func ReadNodeFiles(path string) (Scripts, string, error) {
+func ReadNodeFiles(path string) (types.Scripts, error) {
 	data, err := os.ReadFile(filepath.Join(path, "package.json"))
 	if err != nil {
-		return Scripts{}, "", fmt.Errorf("failed to read package.json: %w", err)
+		return types.Scripts{}, fmt.Errorf("failed to read package.json: %w", err)
 	}
 
 	var pkg nodeScripts
 	if err := json.Unmarshal(data, &pkg); err != nil {
-		return Scripts{}, "", fmt.Errorf("failed to parse package.json: %w", err)
+		return types.Scripts{}, fmt.Errorf("failed to parse package.json: %w", err)
 	}
 
-	return normalizeNodeScripts(pkg.Scripts), path, nil
+	return normalizeNodeScripts(pkg.Scripts), nil
 }
 
-func normalizeNodeScripts(raw map[string]string) Scripts {
-	var s Scripts
+func normalizeNodeScripts(raw map[string]string) types.Scripts {
+	var s types.Scripts
 	for key := range raw {
 		keyLower := strings.ToLower(key)
 		switch {

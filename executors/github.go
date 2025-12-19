@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"log"
 	"os"
-
-	"github.com/mzkux/AutoFlow/extractors"
-	"gopkg.in/yaml.v3"
 	"path/filepath"
+
+	"github.com/mzkux/AutoFlow/types"
+	"gopkg.in/yaml.v3"
 )
 
 type GithubWorkflow struct {
@@ -41,7 +41,7 @@ type GithubStep struct {
 	With map[string]string `yaml:"with,omitempty"`
 }
 
-func WriteGithubYaml(scripts extractors.Scripts, path string) string {
+func WriteGithubYaml(scripts types.Scripts, path string) string {
 	dataz, err := yaml.Marshal(&GithubWorkflow{
 		Name: "test",
 		On: GithubOn{
