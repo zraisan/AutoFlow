@@ -45,4 +45,5 @@ const (
 	ScreenExecutor  Screen = "executor"
 	ScreenExtractor Screen = "extractor"
 	ScreenDirectory Screen = "directory"
+	ScreenResult    Screen = "result"
 )

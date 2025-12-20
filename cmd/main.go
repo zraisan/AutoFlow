@@ -23,6 +23,7 @@ type Model struct {
 	executor  types.Executor
 	extractor types.Extractor
 	directory types.Directory
+	output    string
 	width     int
 	height    int
 }
@@ -31,6 +32,7 @@ var (
 	titleStyle     = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#B0E2FF"))
 	selectedStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("#1C6EA4")).Bold(true)
 	normalStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#DFDFDF"))
+	outputStyle    = lipgloss.NewStyle().BorderStyle(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("#B0E2FF")).Padding(1, 2)
 	containerStyle = lipgloss.NewStyle().Width(70).Align(lipgloss.Left)
 )
 
@@ -91,7 +93,8 @@ func initialModel() Model {
 			Err:   nil,
 		},
 		executor: types.Executor{
-			Choices: []string{"Github", "Gitlab", "Azure Devops"},
+			Choices:  []string{"Github", "Gitlab", "Azure Devops"},
+			Selected: -1,
 		},
 		extractor: types.Extractor{
 			Choices:  []string{"Node", "Python", "Golang"},
@@ -102,6 +105,7 @@ func initialModel() Model {
 			Err:        nil,
 			FocusInput: true,
 		},
+		output: "",
 	}
 }
 
@@ -212,8 +216,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					currentPath := m.directory.Value.Value()
 					selectedFolder := m.directory.Choices[m.directory.Selected]
 					m.directory.Value.SetValue(currentPath + "/" + selectedFolder)
-					GenerateWorkflow(m, m.directory.Value.Value())
-					return m, tea.Quit
+					m.output = GenerateWorkflow(m, m.directory.Value.Value())
+					m.screen = types.ScreenResult
 				}
 			case "up", "k":
 				if !m.directory.FocusInput && m.directory.Cursor > 0 {
@@ -252,11 +256,25 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.directory.Choices = append(m.directory.Choices, entry.Name())
 			}
 		}
+
+	case types.ScreenResult:
+		if len(m.output) < 1 {
+			return m, tea.Quit
+		}
+
+		switch msg := msg.(type) {
+		case tea.KeyMsg:
+			switch msg.String() {
+			case "enter", "ctrl+c", "q", "esc":
+				return m, tea.Quit
+
+			}
+		}
 	}
 	return m, cmd
 }
 
-func GenerateWorkflow(m Model, directory string) {
+func GenerateWorkflow(m Model, directory string) string {
 	switch m.extractor.Selected {
 	case 0: //Node
 		scripts, err := extractors.ReadNodeFiles(directory)
@@ -266,9 +284,10 @@ func GenerateWorkflow(m Model, directory string) {
 		}
 		switch m.executor.Selected {
 		case 0: //Github
-			executors.WriteGithubYaml(scripts, directory)
+			return executors.WriteGithubYaml(scripts, directory, m.landing.Value.Value())
 		}
 	}
+	return ""
 }
 
 func (m Model) View() string {
@@ -289,7 +308,7 @@ func (m Model) View() string {
 		sb.WriteString("\n")
 	}
 
-	sb.WriteString("\n\n\n\n")
+	sb.WriteString("\n\n")
 	switch m.screen {
 
 	case types.ScreenLanding:
@@ -332,7 +351,13 @@ func (m Model) View() string {
 			if m.extractor.Selected == i {
 				checked = "x"
 			}
-			fmt.Fprintf(&sb, "%s [%s] %s\n", cursor, checked, choice)
+			s := fmt.Sprintf("%s [%s] %s", cursor, checked, choice)
+			if m.extractor.Cursor == i {
+				sb.WriteString(selectedStyle.Render(s))
+			} else {
+				sb.WriteString(normalStyle.Render(s))
+			}
+			sb.WriteString("\n")
 		}
 		sb.WriteString("\nPress q to quit.\n")
 
@@ -346,6 +371,12 @@ func (m Model) View() string {
 			fmt.Fprintf(&sb, "%s %s\n", cursor, choice)
 		}
 		sb.WriteString("\nPress tab to switch focus, enter to select.\n")
+
+	case types.ScreenResult:
+		sb.WriteString(titleStyle.Render("Workflow Overview:") + "\n\n")
+		fmt.Fprintf(&sb, "%s\n\n", m.directory.Value.Value())
+		sb.WriteString(outputStyle.Render(m.output))
+		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, sb.String())
 	}
 
 	content := containerStyle.Render(sb.String())

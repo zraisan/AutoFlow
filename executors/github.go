@@ -41,7 +41,7 @@ type GithubStep struct {
 	With map[string]string `yaml:"with,omitempty"`
 }
 
-func WriteGithubYaml(scripts types.Scripts, path string) string {
+func WriteGithubYaml(scripts types.Scripts, path string, name string) string {
 	steps := []GithubStep{
 		{Name: "Checkout", Uses: "actions/checkout@v4"},
 	}
@@ -63,7 +63,7 @@ func WriteGithubYaml(scripts types.Scripts, path string) string {
 	}
 
 	dataz, err := yaml.Marshal(&GithubWorkflow{
-		Name: "test",
+		Name: name,
 		On: GithubOn{
 			Push: &GithubPushEvent{
 				Branches: []string{"main"},
@@ -83,11 +83,9 @@ func WriteGithubYaml(scripts types.Scripts, path string) string {
 	if err := os.MkdirAll(filepath.Join(path, ".github/workflows"), 0755); err != nil {
 		log.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(path, ".github/workflows/node.yml"), dataz, 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(path, fmt.Sprintf(".github/workflows/%s.yml", name)), dataz, 0644); err != nil {
 		log.Fatal(err)
 	}
 
-	fmt.Println(filepath.Join(path, ".github/workflows"))
-	fmt.Println(string(dataz))
 	return string(dataz)
 }
