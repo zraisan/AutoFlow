@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -18,20 +19,19 @@ import (
 
 type Model struct {
 	screen    types.Screen
+	landing   types.Landing
 	executor  types.Executor
 	extractor types.Extractor
 	directory types.Directory
+	width     int
+	height    int
 }
 
 var (
-	titleStyle    = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#FC8FF6")).Bold(true)
-	selectedStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#FC8FF6")).Bold(true)
-	normalStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#D1CAD1"))
-	choiceStyles  = map[string]lipgloss.Style{
-		"Github":       lipgloss.NewStyle().Foreground(lipgloss.Color("#A855F7")),
-		"Gitlab":       lipgloss.NewStyle().Foreground(lipgloss.Color("#F97316")),
-		"Azure Devops": lipgloss.NewStyle().Foreground(lipgloss.Color("#3B82F6")),
-	}
+	titleStyle     = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#B0E2FF"))
+	selectedStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("#1C6EA4")).Bold(true)
+	normalStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#DFDFDF"))
+	containerStyle = lipgloss.NewStyle().Width(70).Align(lipgloss.Left)
 )
 
 var (
@@ -73,14 +73,23 @@ var listCmd = &cobra.Command{
 }
 
 func initialModel() Model {
-	ti := textinput.New()
-	ti.Placeholder = "./"
-	ti.SetValue("./")
-	ti.Focus()
-	ti.CharLimit = 156
-	ti.Width = 20
+	dirti := textinput.New()
+	dirti.Placeholder = "./"
+	dirti.SetValue(".")
+	dirti.Focus()
+	dirti.CharLimit = 156
+	dirti.Width = 20
+	lanti := textinput.New()
+	lanti.Placeholder = "autoflow"
+	lanti.Focus()
+	lanti.CharLimit = 156
+	lanti.Width = 20
 	return Model{
-		screen: types.ScreenMain,
+		screen: types.ScreenLanding,
+		landing: types.Landing{
+			Value: lanti,
+			Err:   nil,
+		},
 		executor: types.Executor{
 			Choices: []string{"Github", "Gitlab", "Azure Devops"},
 		},
@@ -89,8 +98,9 @@ func initialModel() Model {
 			Selected: -1,
 		},
 		directory: types.Directory{
-			Value: ti,
-			Err:   nil,
+			Value:      dirti,
+			Err:        nil,
+			FocusInput: true,
 		},
 	}
 }
@@ -101,8 +111,30 @@ func (m Model) Init() tea.Cmd {
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
+
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
+		return m, nil
+	}
+
 	switch m.screen {
-	case types.ScreenMain:
+	case types.ScreenLanding:
+		switch msg := msg.(type) {
+		case tea.KeyMsg:
+			switch msg.String() {
+			case "ctrl+c":
+				return m, tea.Quit
+			case "enter":
+				m.screen = types.ScreenExecutor
+			}
+
+		}
+
+		m.landing.Value, cmd = m.landing.Value.Update(msg)
+
+	case types.ScreenExecutor:
 		switch msg := msg.(type) {
 		case tea.KeyMsg:
 			switch msg.String() {
@@ -118,12 +150,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			case "enter", " ":
 				m.executor.Selected = m.executor.Cursor
-				m.screen = types.ScreenExecutor
+				m.screen = types.ScreenExtractor
+			case "shift+tab":
+				m.screen = types.ScreenLanding
 			}
 
 		}
 
-	case types.ScreenExecutor:
+	case types.ScreenExtractor:
 		switch msg := msg.(type) {
 		case tea.KeyMsg:
 			switch msg.String() {
@@ -139,34 +173,64 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			case "enter", " ":
 				m.extractor.Selected = m.extractor.Cursor
-				m.screen = types.ScreenExtractor
+				m.screen = types.ScreenDirectory
+				entries, _ := os.ReadDir(m.directory.Value.Value())
+				m.directory.Choices = m.directory.Choices[:0]
+				for _, entry := range entries {
+					if entry.IsDir() {
+						m.directory.Choices = append(m.directory.Choices, entry.Name())
+					}
+				}
 			case "shift+tab":
-				m.screen = types.ScreenMain
+				m.screen = types.ScreenExecutor
 			}
 		}
 
-	case types.ScreenExtractor:
+	case types.ScreenDirectory:
 		switch msg := msg.(type) {
 		case tea.KeyMsg:
 			switch msg.String() {
 			case "ctrl+c", "esc":
 				return m, tea.Quit
+			case "tab":
+				m.directory.FocusInput = !m.directory.FocusInput
+				if m.directory.FocusInput {
+					m.directory.Value.Focus()
+				} else {
+					m.directory.Value.Blur()
+				}
+			case "shift+tab":
+				m.screen = types.ScreenExtractor
+				m.directory.FocusInput = true
+				m.directory.Value.Focus()
 			case "enter":
-				GenerateWorkflow(m, m.directory.Value.Value())
-				return m, tea.Quit
+				if m.directory.FocusInput {
+					m.directory.FocusInput = false
+				}
+				if !m.directory.FocusInput && len(m.directory.Choices) > 0 {
+					m.directory.Selected = m.directory.Cursor
+					currentPath := m.directory.Value.Value()
+					selectedFolder := m.directory.Choices[m.directory.Selected]
+					m.directory.Value.SetValue(currentPath + "/" + selectedFolder)
+					GenerateWorkflow(m, m.directory.Value.Value())
+					return m, tea.Quit
+				}
 			case "up", "k":
-				if m.directory.Cursor > 0 {
+				if !m.directory.FocusInput && m.directory.Cursor > 0 {
 					m.directory.Cursor--
 				}
 			case "down", "j":
-				if m.directory.Cursor < len(m.directory.Choices)-1 {
+				if !m.directory.FocusInput && m.directory.Cursor < len(m.directory.Choices)-1 {
 					m.directory.Cursor++
 				}
 			case " ":
-				m.directory.Selected = m.directory.Cursor
-				m.directory.Value.SetValue(m.directory.Choices[m.directory.Selected])
-			case "shift+tab":
-				m.screen = types.ScreenExecutor
+				if !m.directory.FocusInput && len(m.directory.Choices) > 0 {
+					m.directory.Selected = m.directory.Cursor
+					currentPath := m.directory.Value.Value()
+					selectedFolder := m.directory.Choices[m.directory.Selected]
+					m.directory.Value.SetValue(currentPath + "/" + selectedFolder)
+					m.directory.Cursor = 0
+				}
 			}
 
 		case types.ErrMsg:
@@ -174,7 +238,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
-		m.directory.Value, cmd = m.directory.Value.Update(msg)
+		if m.directory.FocusInput {
+			m.directory.Value, cmd = m.directory.Value.Update(msg)
+			m.directory.Cursor = 0
+		}
+
 		entries, _ := os.ReadDir(m.directory.Value.Value())
 		if len(m.directory.Choices) > 0 {
 			m.directory.Choices = m.directory.Choices[:0]
@@ -190,24 +258,49 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func GenerateWorkflow(m Model, directory string) {
 	switch m.extractor.Selected {
-	case 0:
+	case 0: //Node
 		scripts, err := extractors.ReadNodeFiles(directory)
 		if err != nil {
 			fmt.Printf("Extraction error: %v", err)
 			os.Exit(1)
 		}
 		switch m.executor.Selected {
-		case 0:
+		case 0: //Github
 			executors.WriteGithubYaml(scripts, directory)
 		}
 	}
 }
 
 func (m Model) View() string {
-	var msg string
+	var sb strings.Builder
+
+	asciiTitle := []string{
+		` █████╗ ██╗   ██╗████████╗ ██████╗ ███████╗██╗      ██████╗ ██╗    ██╗`,
+		`██╔══██╗██║   ██║╚══██╔══╝██╔═══██╗██╔════╝██║     ██╔═══██╗██║    ██║`,
+		`███████║██║   ██║   ██║   ██║   ██║█████╗  ██║     ██║   ██║██║ █╗ ██║`,
+		`██╔══██║██║   ██║   ██║   ██║   ██║██╔══╝  ██║     ██║   ██║██║███╗██║`,
+		`██║  ██║╚██████╔╝   ██║   ╚██████╔╝██║     ███████╗╚██████╔╝╚███╔███╔╝`,
+		`╚═╝  ╚═╝ ╚═════╝    ╚═╝    ╚═════╝ ╚═╝     ╚══════╝ ╚═════╝  ╚══╝╚══╝ `,
+	}
+	titleColors := []string{"#B0E2FF", "#87CEEB", "#6BB3D9", "#4A9CC7", "#2E86B5", "#1C6EA4"}
+
+	for i, line := range asciiTitle {
+		sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(titleColors[i])).Render(line))
+		sb.WriteString("\n")
+	}
+
+	sb.WriteString("\n\n\n\n")
 	switch m.screen {
-	case types.ScreenMain:
-		msg += titleStyle.Render("What Executor Would You Like To Use?") + "\n"
+
+	case types.ScreenLanding:
+
+		sb.WriteString(titleStyle.Render("Pick a name for your workflow"))
+		sb.WriteString("\n\n")
+		sb.WriteString(m.landing.Value.View())
+
+	case types.ScreenExecutor:
+		sb.WriteString(titleStyle.Render("What Executor Would You Like To Use?"))
+		sb.WriteString("\n\n")
 		for i, choice := range m.executor.Choices {
 			cursor := " "
 			if m.executor.Cursor == i {
@@ -217,21 +310,19 @@ func (m Model) View() string {
 			if m.executor.Selected == i {
 				checked = "x"
 			}
-			styledChoice := choice
-			if style, ok := choiceStyles[choice]; ok {
-				styledChoice = style.Render(choice)
-			}
-			s := fmt.Sprintf("%s [%s] %s", cursor, checked, styledChoice)
+			s := fmt.Sprintf("%s [%s] %s", cursor, checked, choice)
 			if m.executor.Cursor == i {
-				msg += selectedStyle.Render(s) + "\n"
+				sb.WriteString(selectedStyle.Render(s))
 			} else {
-				msg += normalStyle.Render(s) + "\n"
+				sb.WriteString(normalStyle.Render(s))
 			}
+			sb.WriteString("\n")
 		}
-		msg += "\nPress q to quit.\n"
+		sb.WriteString("\nPress q to quit.\n")
 
-	case types.ScreenExecutor:
-		msg += "What Extractor Would You Like To Use?\n\n"
+	case types.ScreenExtractor:
+		sb.WriteString(titleStyle.Render("What Extractor Would You Like To Use?"))
+		sb.WriteString("\n\n")
 		for i, choice := range m.extractor.Choices {
 			cursor := " "
 			if m.extractor.Cursor == i {
@@ -241,27 +332,24 @@ func (m Model) View() string {
 			if m.extractor.Selected == i {
 				checked = "x"
 			}
-			msg += fmt.Sprintf("%s [%s] %s\n", cursor, checked, choice)
+			fmt.Fprintf(&sb, "%s [%s] %s\n", cursor, checked, choice)
 		}
-		msg += "\nPress q to quit.\n"
-		return msg
+		sb.WriteString("\nPress q to quit.\n")
 
-	case types.ScreenExtractor:
-		msg += fmt.Sprintf("Project Directory: %s", m.directory.Value.View())
+	case types.ScreenDirectory:
+		fmt.Fprintf(&sb, "Project Directory: %s\n\n", m.directory.Value.View())
 		for i, choice := range m.directory.Choices {
-			cursor := ""
-			if m.directory.Cursor == i {
+			cursor := " "
+			if !m.directory.FocusInput && m.directory.Cursor == i {
 				cursor = ">"
 			}
-			checked := " "
-			if m.directory.Selected == i {
-				checked = "x"
-			}
-			msg += fmt.Sprintf("\n %s [%s] %s", cursor, checked, choice)
+			fmt.Fprintf(&sb, "%s %s\n", cursor, choice)
 		}
+		sb.WriteString("\nPress tab to switch focus, enter to select.\n")
 	}
 
-	return msg
+	content := containerStyle.Render(sb.String())
+	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, content)
 }
 
 func main() {

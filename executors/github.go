@@ -42,6 +42,26 @@ type GithubStep struct {
 }
 
 func WriteGithubYaml(scripts types.Scripts, path string) string {
+	steps := []GithubStep{
+		{Name: "Checkout", Uses: "actions/checkout@v4"},
+	}
+
+	if scripts.Install != "" {
+		steps = append(steps, GithubStep{Name: "Install", Run: scripts.Install})
+	}
+	if scripts.Lint != "" {
+		steps = append(steps, GithubStep{Name: "Lint", Run: scripts.Lint})
+	}
+	if scripts.Build != "" {
+		steps = append(steps, GithubStep{Name: "Build", Run: scripts.Build})
+	}
+	if scripts.Test != "" {
+		steps = append(steps, GithubStep{Name: "Test", Run: scripts.Test})
+	}
+	if scripts.Deploy != "" {
+		steps = append(steps, GithubStep{Name: "Deploy", Run: scripts.Deploy})
+	}
+
 	dataz, err := yaml.Marshal(&GithubWorkflow{
 		Name: "test",
 		On: GithubOn{
@@ -52,14 +72,7 @@ func WriteGithubYaml(scripts types.Scripts, path string) string {
 		Jobs: map[string]GithubJob{
 			"build": {
 				RunsOn: "ubuntu-latest",
-				Steps: []GithubStep{
-					{Name: "Checkout", Uses: "actions/checkout@v4"},
-					{Name: "Install", Run: scripts.Install},
-					{Name: "Lint", Run: scripts.Lint},
-					{Name: "Build", Run: scripts.Build},
-					{Name: "Test", Run: scripts.Test},
-					{Name: "Deploy", Run: scripts.Deploy},
-				},
+				Steps:  steps,
 			},
 		},
 	})

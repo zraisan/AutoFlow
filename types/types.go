@@ -10,6 +10,11 @@ type Scripts struct {
 	Deploy  string
 }
 
+type Landing struct {
+	Value textinput.Model
+	Err   error
+}
+
 type Extractor struct {
 	Choices  []string
 	Cursor   int
@@ -17,11 +22,12 @@ type Extractor struct {
 }
 
 type Directory struct {
-	Value    textinput.Model
-	Choices  []string
-	Cursor   int
-	Selected int
-	Err      error
+	Value      textinput.Model
+	Choices    []string
+	Cursor     int
+	Selected   int
+	Err        error
+	FocusInput bool
 }
 
 type Executor struct {
@@ -35,7 +41,8 @@ type ErrMsg error
 type Screen string
 
 const (
-	ScreenMain      Screen = "main"
+	ScreenLanding   Screen = "landing"
 	ScreenExecutor  Screen = "executor"
 	ScreenExtractor Screen = "extractor"
+	ScreenDirectory Screen = "directory"
 )
