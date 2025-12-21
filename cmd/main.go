@@ -162,6 +162,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case types.ScreenExtractor:
+		m.directory.Choices = m.directory.Choices[:0]
 		switch msg := msg.(type) {
 		case tea.KeyMsg:
 			switch msg.String() {
@@ -179,7 +180,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.extractor.Selected = m.extractor.Cursor
 				m.screen = types.ScreenDirectory
 				entries, _ := os.ReadDir(m.directory.Value.Value())
-				m.directory.Choices = m.directory.Choices[:0]
 				for _, entry := range entries {
 					if entry.IsDir() {
 						m.directory.Choices = append(m.directory.Choices, entry.Name())
@@ -265,8 +265,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg := msg.(type) {
 		case tea.KeyMsg:
 			switch msg.String() {
-			case "enter", "ctrl+c", "q", "esc":
+			case "ctrl+c", "q", "esc":
 				return m, tea.Quit
+			case "shift+tab":
+				m.screen = types.ScreenDirectory
+			case "enter":
+				newModel := initialModel()
+				newModel.height = m.height
+				newModel.width = m.width
+				return newModel, textinput.Blink
 
 			}
 		}
@@ -325,11 +332,7 @@ func (m Model) View() string {
 			if m.executor.Cursor == i {
 				cursor = ">"
 			}
-			checked := " "
-			if m.executor.Selected == i {
-				checked = "x"
-			}
-			s := fmt.Sprintf("%s [%s] %s", cursor, checked, choice)
+			s := fmt.Sprintf("%s %s", cursor, choice)
 			if m.executor.Cursor == i {
 				sb.WriteString(selectedStyle.Render(s))
 			} else {
@@ -347,11 +350,7 @@ func (m Model) View() string {
 			if m.extractor.Cursor == i {
 				cursor = ">"
 			}
-			checked := " "
-			if m.extractor.Selected == i {
-				checked = "x"
-			}
-			s := fmt.Sprintf("%s [%s] %s", cursor, checked, choice)
+			s := fmt.Sprintf("%s %s", cursor, choice)
 			if m.extractor.Cursor == i {
 				sb.WriteString(selectedStyle.Render(s))
 			} else {
@@ -370,7 +369,7 @@ func (m Model) View() string {
 			}
 			fmt.Fprintf(&sb, "%s %s\n", cursor, choice)
 		}
-		sb.WriteString("\nPress tab to switch focus, enter to select.\n")
+		sb.WriteString("\nPress tab to switch focus, space to access, enter to select.\n")
 
 	case types.ScreenResult:
 		sb.WriteString(titleStyle.Render("Workflow Overview:") + "\n\n")
