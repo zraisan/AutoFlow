@@ -11,18 +11,57 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/fang"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/mzkux/AutoFlow/executors"
-	"github.com/mzkux/AutoFlow/extractors"
-	"github.com/mzkux/AutoFlow/types"
+	"github.com/mzkux/AutoFlow/registry"
 	"github.com/spf13/cobra"
+
+	_ "github.com/mzkux/AutoFlow/executors"
+	_ "github.com/mzkux/AutoFlow/extractors"
 )
 
+type Screen string
+
+const (
+	ScreenLanding   Screen = "landing"
+	ScreenExecutor  Screen = "executor"
+	ScreenExtractor Screen = "extractor"
+	ScreenDirectory Screen = "directory"
+	ScreenResult    Screen = "result"
+)
+
+type ErrMsg error
+
+type Landing struct {
+	Value textinput.Model
+	Err   error
+}
+
+type Executor struct {
+	Choices  []string
+	Cursor   int
+	Selected int
+}
+
+type Extractor struct {
+	Choices  []string
+	Cursor   int
+	Selected int
+}
+
+type Directory struct {
+	Value      textinput.Model
+	Choices    []string
+	Cursor     int
+	Selected   int
+	Err        error
+	FocusInput bool
+}
+
 type Model struct {
-	screen    types.Screen
-	landing   types.Landing
-	executor  types.Executor
-	extractor types.Extractor
-	directory types.Directory
+	screen    Screen
+	landing   Landing
+	executor  Executor
+	extractor Extractor
+	directory Directory
 	output    string
 	width     int
 	height    int
@@ -87,23 +126,24 @@ func initialModel() Model {
 	lanti.CharLimit = 156
 	lanti.Width = 20
 	return Model{
-		screen: types.ScreenLanding,
-		landing: types.Landing{
+		screen: ScreenLanding,
+		landing: Landing{
 			Value: lanti,
 			Err:   nil,
 		},
-		executor: types.Executor{
-			Choices:  []string{"Github", "Gitlab", "Azure Devops"},
+		executor: Executor{
+			Choices:  registry.ExecutorNames(),
 			Selected: -1,
 		},
-		extractor: types.Extractor{
-			Choices:  []string{"Node", "Python", "Golang"},
+		extractor: Extractor{
+			Choices:  registry.ExtractorNames(),
 			Selected: -1,
 		},
-		directory: types.Directory{
+		directory: Directory{
 			Value:      dirti,
 			Err:        nil,
 			FocusInput: true,
+			Selected:   -1,
 		},
 		output: "",
 	}
@@ -124,21 +164,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	switch m.screen {
-	case types.ScreenLanding:
+	case ScreenLanding:
 		switch msg := msg.(type) {
 		case tea.KeyMsg:
 			switch msg.String() {
 			case "ctrl+c":
 				return m, tea.Quit
 			case "enter":
-				m.screen = types.ScreenExecutor
+				m.screen = ScreenExecutor
 			}
 
 		}
 
 		m.landing.Value, cmd = m.landing.Value.Update(msg)
 
-	case types.ScreenExecutor:
+	case ScreenExecutor:
 		switch msg := msg.(type) {
 		case tea.KeyMsg:
 			switch msg.String() {
@@ -154,14 +194,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			case "enter", " ":
 				m.executor.Selected = m.executor.Cursor
-				m.screen = types.ScreenExtractor
+				m.screen = ScreenExtractor
 			case "shift+tab":
-				m.screen = types.ScreenLanding
+				m.screen = ScreenLanding
 			}
 
 		}
 
-	case types.ScreenExtractor:
+	case ScreenExtractor:
 		m.directory.Choices = m.directory.Choices[:0]
 		switch msg := msg.(type) {
 		case tea.KeyMsg:
@@ -178,7 +218,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			case "enter", " ":
 				m.extractor.Selected = m.extractor.Cursor
-				m.screen = types.ScreenDirectory
+				m.screen = ScreenDirectory
 				entries, _ := os.ReadDir(m.directory.Value.Value())
 				for _, entry := range entries {
 					if entry.IsDir() {
@@ -186,11 +226,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 				}
 			case "shift+tab":
-				m.screen = types.ScreenExecutor
+				m.screen = ScreenExecutor
 			}
 		}
 
-	case types.ScreenDirectory:
+	case ScreenDirectory:
 		switch msg := msg.(type) {
 		case tea.KeyMsg:
 			switch msg.String() {
@@ -198,18 +238,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, tea.Quit
 			case "tab":
 				m.directory.FocusInput = !m.directory.FocusInput
-				if m.directory.FocusInput {
-					m.directory.Value.Focus()
-				} else {
-					m.directory.Value.Blur()
-				}
 			case "shift+tab":
-				m.screen = types.ScreenExtractor
+				m.screen = ScreenExtractor
 				m.directory.FocusInput = true
 				m.directory.Value.Focus()
 			case "enter":
 				if m.directory.FocusInput {
-					m.directory.FocusInput = false
+					m.output = GenerateWorkflow(m, m.directory.Value.Value())
+					m.screen = ScreenResult
 				}
 				if !m.directory.FocusInput && len(m.directory.Choices) > 0 {
 					m.directory.Selected = m.directory.Cursor
@@ -217,7 +253,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					selectedFolder := m.directory.Choices[m.directory.Selected]
 					m.directory.Value.SetValue(currentPath + "/" + selectedFolder)
 					m.output = GenerateWorkflow(m, m.directory.Value.Value())
-					m.screen = types.ScreenResult
+					m.screen = ScreenResult
 				}
 			case "up", "k":
 				if !m.directory.FocusInput && m.directory.Cursor > 0 {
@@ -237,7 +273,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 
-		case types.ErrMsg:
+		case ErrMsg:
 			m.directory.Err = msg
 			return m, nil
 		}
@@ -257,7 +293,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
-	case types.ScreenResult:
+	case ScreenResult:
 		if len(m.output) < 1 {
 			return m, tea.Quit
 		}
@@ -268,7 +304,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "ctrl+c", "q", "esc":
 				return m, tea.Quit
 			case "shift+tab":
-				m.screen = types.ScreenDirectory
+				m.screen = ScreenDirectory
 			case "enter":
 				newModel := initialModel()
 				newModel.height = m.height
@@ -282,19 +318,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func GenerateWorkflow(m Model, directory string) string {
-	switch m.extractor.Selected {
-	case 0: //Node
-		scripts, err := extractors.ReadNodeFiles(directory)
-		if err != nil {
-			fmt.Printf("Extraction error: %v", err)
-			os.Exit(1)
-		}
-		switch m.executor.Selected {
-		case 0: //Github
-			return executors.WriteGithubYaml(scripts, directory, m.landing.Value.Value())
-		}
+	extractor := registry.GetExtractor(m.extractor.Selected)
+	result, err := extractor.Extract(directory)
+	if err != nil {
+		fmt.Printf("Extraction error: %v", err)
+		os.Exit(1)
 	}
-	return ""
+
+	executor := registry.GetExecutor(m.executor.Selected)
+	output, err := executor.Generate(result, directory, m.landing.Value.Value())
+	if err != nil {
+		fmt.Printf("Generation error: %v", err)
+		os.Exit(1)
+	}
+
+	return output
 }
 
 func (m Model) View() string {
@@ -318,13 +356,13 @@ func (m Model) View() string {
 	sb.WriteString("\n\n")
 	switch m.screen {
 
-	case types.ScreenLanding:
+	case ScreenLanding:
 
 		sb.WriteString(titleStyle.Render("Pick a name for your workflow"))
 		sb.WriteString("\n\n")
 		sb.WriteString(m.landing.Value.View())
 
-	case types.ScreenExecutor:
+	case ScreenExecutor:
 		sb.WriteString(titleStyle.Render("What Executor Would You Like To Use?"))
 		sb.WriteString("\n\n")
 		for i, choice := range m.executor.Choices {
@@ -342,7 +380,7 @@ func (m Model) View() string {
 		}
 		sb.WriteString("\nPress q to quit.\n")
 
-	case types.ScreenExtractor:
+	case ScreenExtractor:
 		sb.WriteString(titleStyle.Render("What Extractor Would You Like To Use?"))
 		sb.WriteString("\n\n")
 		for i, choice := range m.extractor.Choices {
@@ -360,7 +398,7 @@ func (m Model) View() string {
 		}
 		sb.WriteString("\nPress q to quit.\n")
 
-	case types.ScreenDirectory:
+	case ScreenDirectory:
 		fmt.Fprintf(&sb, "Project Directory: %s\n\n", m.directory.Value.View())
 		for i, choice := range m.directory.Choices {
 			cursor := " "
@@ -371,7 +409,7 @@ func (m Model) View() string {
 		}
 		sb.WriteString("\nPress tab to switch focus, space to access, enter to select.\n")
 
-	case types.ScreenResult:
+	case ScreenResult:
 		sb.WriteString(titleStyle.Render("Workflow Overview:") + "\n\n")
 		fmt.Fprintf(&sb, "%s\n\n", m.directory.Value.Value())
 		sb.WriteString(outputStyle.Render(m.output))
@@ -385,7 +423,7 @@ func (m Model) View() string {
 func main() {
 	rootCmd.AddCommand(listCmd)
 	if err := fang.Execute(context.Background(), rootCmd); err != nil {
-		fmt.Scanln("An Error Ocurred")
+		fmt.Println("An Error Ocurred")
 		os.Exit(1)
 	}
 }

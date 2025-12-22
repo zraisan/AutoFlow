@@ -6,86 +6,149 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/mzkux/AutoFlow/types"
+	"github.com/mzkux/AutoFlow/registry"
 	"gopkg.in/yaml.v3"
 )
 
-type GithubWorkflow struct {
+func init() {
+	registry.RegisterExecutor(&GithubExecutor{})
+}
+
+type GithubExecutor struct{}
+
+type githubWorkflow struct {
 	Name string               `yaml:"name"`
-	On   GithubOn             `yaml:"on"`
-	Jobs map[string]GithubJob `yaml:"jobs"`
+	On   githubOn             `yaml:"on"`
+	Jobs map[string]githubJob `yaml:"jobs"`
 }
 
-type GithubOn struct {
-	Push        *GithubPushEvent        `yaml:"push,omitempty"`
-	PullRequest *GithubPullRequestEvent `yaml:"pull_request,omitempty"`
+type githubOn struct {
+	Push        *githubPushEvent        `yaml:"push,omitempty"`
+	PullRequest *githubPullRequestEvent `yaml:"pull_request,omitempty"`
 }
 
-type GithubPushEvent struct {
+type githubPushEvent struct {
 	Branches []string `yaml:"branches,omitempty"`
 }
 
-type GithubPullRequestEvent struct {
+type githubPullRequestEvent struct {
 	Branches []string `yaml:"branches,omitempty"`
 }
 
-type GithubJob struct {
+type githubJob struct {
 	RunsOn string       `yaml:"runs-on"`
-	Steps  []GithubStep `yaml:"steps"`
+	Steps  []githubStep `yaml:"steps"`
 }
 
-type GithubStep struct {
+type githubStep struct {
 	Name string            `yaml:"name,omitempty"`
 	Uses string            `yaml:"uses,omitempty"`
 	Run  string            `yaml:"run,omitempty"`
 	With map[string]string `yaml:"with,omitempty"`
 }
 
-func WriteGithubYaml(scripts types.Scripts, path string, name string) string {
-	steps := []GithubStep{
+func (g *GithubExecutor) Name() string {
+	return "GitHub"
+}
+
+func (g *GithubExecutor) Generate(result *registry.ExtractorResult, path, name string) (string, error) {
+	steps := []githubStep{
 		{Name: "Checkout", Uses: "actions/checkout@v4"},
 	}
 
-	if scripts.Install != "" {
-		steps = append(steps, GithubStep{Name: "Install", Run: scripts.Install})
-	}
-	if scripts.Lint != "" {
-		steps = append(steps, GithubStep{Name: "Lint", Run: scripts.Lint})
-	}
-	if scripts.Build != "" {
-		steps = append(steps, GithubStep{Name: "Build", Run: scripts.Build})
-	}
-	if scripts.Test != "" {
-		steps = append(steps, GithubStep{Name: "Test", Run: scripts.Test})
-	}
-	if scripts.Deploy != "" {
-		steps = append(steps, GithubStep{Name: "Deploy", Run: scripts.Deploy})
+	setupSteps := g.createSetupSteps(result)
+	steps = append(steps, setupSteps...)
+
+	for stepName, command := range result.Scripts {
+		steps = append(steps, githubStep{
+			Name: stepName,
+			Run:  command,
+		})
 	}
 
-	dataz, err := yaml.Marshal(&GithubWorkflow{
+	workflow := githubWorkflow{
 		Name: name,
-		On: GithubOn{
-			Push: &GithubPushEvent{
+		On: githubOn{
+			Push: &githubPushEvent{
 				Branches: []string{"main"},
 			},
 		},
-		Jobs: map[string]GithubJob{
+		Jobs: map[string]githubJob{
 			"build": {
 				RunsOn: "ubuntu-latest",
 				Steps:  steps,
 			},
 		},
-	})
+	}
+
+	data, err := yaml.Marshal(&workflow)
 	if err != nil {
+		return "", fmt.Errorf("failed to marshal workflow: %w", err)
+	}
+
+	workflowDir := filepath.Join(path, ".github/workflows")
+	if err := os.MkdirAll(workflowDir, 0755); err != nil {
 		log.Fatal(err)
 	}
 
-	if err := os.MkdirAll(filepath.Join(path, ".github/workflows"), 0755); err != nil {
-		log.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(path, fmt.Sprintf(".github/workflows/%s.yml", name)), dataz, 0644); err != nil {
+	workflowPath := filepath.Join(workflowDir, fmt.Sprintf("%s.yml", name))
+	if err := os.WriteFile(workflowPath, data, 0644); err != nil {
 		log.Fatal(err)
 	}
 
-	return string(dataz)
+	return string(data), nil
+}
+
+func (g *GithubExecutor) createSetupSteps(result *registry.ExtractorResult) []githubStep {
+	switch result.Runtime {
+	case "node":
+		return []githubStep{
+			{
+				Name: "Setup Node.js",
+				Uses: "actions/setup-node@v4",
+				With: map[string]string{
+					"node-version": result.RuntimeVersion,
+				},
+			},
+		}
+	case "go":
+		return []githubStep{
+			{
+				Name: "Setup Go",
+				Uses: "actions/setup-go@v5",
+				With: map[string]string{
+					"go-version": result.RuntimeVersion,
+				},
+			},
+			{
+				Name: "Golangci-lint",
+				Uses: "golangci/golangci-lint-action@v6",
+			},
+		}
+	case "python":
+		steps := []githubStep{
+			{
+				Name: "Setup Python",
+				Uses: "actions/setup-python@v5",
+				With: map[string]string{
+					"python-version": result.RuntimeVersion,
+				},
+			},
+		}
+
+		switch result.PackageManager {
+		case "uv":
+			steps = append(steps, githubStep{
+				Name: "Install uv",
+				Uses: "astral-sh/setup-uv@v4",
+			})
+		case "poetry":
+			steps = append(steps, githubStep{
+				Name: "Install Poetry",
+				Uses: "snok/install-poetry@v1",
+			})
+		}
+		return steps
+	}
+	return nil
 }

@@ -1,4 +1,4 @@
-name: c
+name: t
 "on":
     push:
         branches:
@@ -9,9 +9,7 @@ jobs:
         steps:
             - name: Checkout
               uses: actions/checkout@v4
-            - name: Install
-              run: npm install
-            - name: Lint
-              run: npm run lint
-            - name: Build
-              run: npm run build
+            - name: Setup Python
+              uses: actions/setup-python@v5
+              with:
+                python-version: "3.13"
