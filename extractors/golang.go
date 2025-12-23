@@ -46,7 +46,7 @@ func detectGoVersion(gomod string) (string, string) {
 		if after, found := strings.CutPrefix(line, "go "); found {
 			version := strings.TrimSpace(after)
 			if version >= "1.24" {
-				return "stable", "golang:latest"
+				return "1.24", "golang:latest"
 			}
 			return version, "golang:" + version
 		}
