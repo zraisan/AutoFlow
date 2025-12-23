@@ -38,9 +38,11 @@ func (n *NodeExtractor) Extract(path string) (*registry.ExtractorResult, error) 
 		return nil, fmt.Errorf("failed to parse package.json: %w", err)
 	}
 
+	version, image := detectNodeVersion(path, pkg)
 	result := &registry.ExtractorResult{
 		Runtime:        "node",
-		RuntimeVersion: detectNodeVersion(path, pkg),
+		RuntimeVersion: version,
+		Image:          image,
 		PackageManager: detectNodePackageManager(path),
 		Scripts:        normalizeNodeScripts(pkg.Scripts),
 	}
@@ -48,25 +50,25 @@ func (n *NodeExtractor) Extract(path string) (*registry.ExtractorResult, error) 
 	return result, nil
 }
 
-func detectNodeVersion(path string, pkg packageJSON) string {
+func detectNodeVersion(path string, pkg packageJSON) (string, string) {
+	version := "20"
+
 	if nvmrc, err := os.ReadFile(filepath.Join(path, ".nvmrc")); err == nil {
-		version := strings.TrimSpace(string(nvmrc))
-		version = strings.TrimPrefix(version, "v")
-		if version != "" {
-			return version
+		v := strings.TrimSpace(string(nvmrc))
+		v = strings.TrimPrefix(v, "v")
+		if v != "" {
+			version = v
+		}
+	} else if pkg.Engines.Node != "" {
+		v := pkg.Engines.Node
+		v = strings.TrimLeft(v, ">=^~")
+		v = strings.Split(v, " ")[0]
+		if v != "" {
+			version = v
 		}
 	}
 
-	if pkg.Engines.Node != "" {
-		version := pkg.Engines.Node
-		version = strings.TrimLeft(version, ">=^~")
-		version = strings.Split(version, " ")[0]
-		if version != "" {
-			return version
-		}
-	}
-
-	return "20"
+	return version, "node:" + version + "-alpine"
 }
 
 func detectNodePackageManager(path string) string {

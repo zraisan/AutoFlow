@@ -25,9 +25,11 @@ func (g *GolangExtractor) Extract(path string) (*registry.ExtractorResult, error
 		return nil, fmt.Errorf("failed to read go.mod: %w", err)
 	}
 
+	version, image := detectGoVersion(string(data))
 	result := &registry.ExtractorResult{
 		Runtime:        "go",
-		RuntimeVersion: detectGoVersion(string(data)),
+		RuntimeVersion: version,
+		Image:          image,
 		PackageManager: "go",
 		Scripts: map[string]string{
 			"Build": "go build -v ./...",
@@ -38,12 +40,16 @@ func (g *GolangExtractor) Extract(path string) (*registry.ExtractorResult, error
 	return result, nil
 }
 
-func detectGoVersion(gomod string) string {
+func detectGoVersion(gomod string) (string, string) {
 	for line := range strings.SplitSeq(gomod, "\n") {
 		line = strings.TrimSpace(line)
 		if after, found := strings.CutPrefix(line, "go "); found {
-			return strings.TrimSpace(after)
+			version := strings.TrimSpace(after)
+			if version >= "1.24" {
+				return version, "golang:latest"
+			}
+			return version, "golang:" + version
 		}
 	}
-	return "1.25.4"
+	return "latest", "golang:latest"
 }

@@ -24,9 +24,11 @@ func (p *PythonExtractor) Extract(path string) (*registry.ExtractorResult, error
 	var packageManager string
 	packageManager = detectPythonPackageManager(path)
 
+	version, image := detectPythonVersion(path)
 	result := &registry.ExtractorResult{
 		Runtime:        "python",
-		RuntimeVersion: detectPythonVersion(path),
+		RuntimeVersion: version,
+		Image:          image,
 		PackageManager: packageManager,
 		Scripts:        normalizePythonScripts(path, packageManager),
 	}
@@ -50,7 +52,7 @@ func detectPythonPackageManager(path string) string {
 	return "uv"
 }
 
-func detectPythonVersion(path string) string {
+func detectPythonVersion(path string) (string, string) {
 	entries, err := os.ReadDir(filepath.Join(path, ".venv"))
 	if err != nil {
 		fmt.Println(err)
@@ -58,11 +60,10 @@ func detectPythonVersion(path string) string {
 
 	for _, entry := range entries {
 		if after, found := strings.CutPrefix(entry.Name(), "python"); found {
-			return after
+			return after, "python:" + after + "-slim"
 		}
-
 	}
-	return "3.13"
+	return "3.13", "python:3.13-slim"
 }
 
 func normalizePythonScripts(path string, packageManager string) map[string]string {

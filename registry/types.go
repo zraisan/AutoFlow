@@ -3,6 +3,7 @@ package registry
 type ExtractorResult struct {
 	Runtime        string
 	RuntimeVersion string
+	Image          string
 	PackageManager string
 	Scripts        map[string]string
 }

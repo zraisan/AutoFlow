@@ -91,6 +91,9 @@ func (g *GithubExecutor) Generate(result *registry.ExtractorResult, path, name s
 		log.Fatal(err)
 	}
 
+	if len(name) == 0 {
+		name = "ci"
+	}
 	workflowPath := filepath.Join(workflowDir, fmt.Sprintf("%s.yml", name))
 	if err := os.WriteFile(workflowPath, data, 0644); err != nil {
 		log.Fatal(err)

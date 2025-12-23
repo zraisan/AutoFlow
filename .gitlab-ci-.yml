@@ -1,0 +1,13 @@
+stages:
+    - build
+    - test
+Build:
+    stage: build
+    image: golang:latest
+    script:
+        - go build -v ./...
+Test:
+    stage: test
+    image: golang:latest
+    script:
+        - go test -v ./...
