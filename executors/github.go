@@ -126,9 +126,6 @@ func (g *GithubExecutor) createSetupSteps(result *registry.ExtractorResult) []gi
 			{
 				Name: "Golangci-lint",
 				Uses: "golangci/golangci-lint-action@v7",
-				With: map[string]string{
-					"version": "v2.7.2",
-				},
 			},
 		}
 	case "python":
