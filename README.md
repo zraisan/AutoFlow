@@ -250,4 +250,4 @@ func (e *RustExtractor) Extract(path string) registry.ExtractorResult {
 
 ## License
 
-MIT License - see LICENSE file for details.
+MIT License - see [LICENSE](LISENCE) file for details.
