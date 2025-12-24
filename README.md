@@ -9,12 +9,14 @@
 
 <br>
 
-AutoFlow is a powerful CI/CD workflow automation tool that automatically generates pipeline configurations for GitHub Actions and GitLab CI. Built with Go using the Charm stack (Bubble Tea and Lipgloss), AutoFlow features an interactive Terminal User Interface that guides you through detecting your project's runtime and generating the appropriate workflow files.
+![AutoFlow](./assets/landing.png)
+
+AutoFlow is a powerful CI/CD workflow automation tool that automatically generates pipeline configurations for various CI/CD platforms. Built with Go using the Charm stack (Bubble Tea and Lipgloss), AutoFlow features an interactive Terminal User Interface that guides you through detecting your project's runtime and generating the appropriate workflow files.
 
 ## Features
 
 - **Automatic Runtime Detection** - Detects Go, Python, and Node.js projects automatically
-- **Multi-Platform Support** - Generates configurations for GitHub Actions and GitLab CI
+- **Multi-Platform Support** - Generates configurations for various CI/CD platforms
 - **Interactive TUI** - Beautiful terminal interface for easy configuration
 - **Smart Defaults** - Intelligently selects Docker images, package managers, and scripts
 - **Extensible Architecture** - Plugin-based registry system for adding new extractors and executors
@@ -123,7 +125,7 @@ Simply run `autoflow` to launch the interactive TUI:
 You'll be guided through:
 
 1. **Workflow Name** - Enter a name for your CI/CD workflow
-2. **Platform Selection** - Choose between GitHub Actions or GitLab CI
+2. **Platform Selection** - Choose your target CI/CD platform
 3. **Runtime Selection** - Select your project's runtime (Go, Python, or Node.js)
 4. **Directory Selection** - Navigate to your project directory
 5. **Review & Save** - View the generated configuration and save it
@@ -135,7 +137,7 @@ You'll be guided through:
 - Detects version from `go.mod`
 - Generates `golang:version` Docker image
 - Includes `go build` and `go test` commands
-- Adds `golangci-lint` for GitHub Actions
+- Adds linting support where available
 
 ### Python Projects
 

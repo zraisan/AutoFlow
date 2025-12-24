@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/mzkux/AutoFlow/registry"
+	"github.com/zraisan/AutoFlow/registry"
 	"gopkg.in/yaml.v3"
 )
 

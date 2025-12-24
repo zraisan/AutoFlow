@@ -11,11 +11,11 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/fang"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/mzkux/AutoFlow/registry"
+	"github.com/zraisan/AutoFlow/registry"
 	"github.com/spf13/cobra"
 
-	_ "github.com/mzkux/AutoFlow/executors"
-	_ "github.com/mzkux/AutoFlow/extractors"
+	_ "github.com/zraisan/AutoFlow/executors"
+	_ "github.com/zraisan/AutoFlow/extractors"
 )
 
 type Screen string

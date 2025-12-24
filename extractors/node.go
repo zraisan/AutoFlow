@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/mzkux/AutoFlow/registry"
+	"github.com/zraisan/AutoFlow/registry"
 )
 
 func init() {
