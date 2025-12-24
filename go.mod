@@ -1,4 +1,4 @@
-module github.com/mzkux/AutoFlow
+module github.com/zraisan/AutoFlow
 
 go 1.25.4
 
