@@ -86,6 +86,7 @@ func detectNodePackageManager(path string) string {
 
 func normalizeNodeScripts(raw map[string]string) map[string]string {
 	s := make(map[string]string)
+	s["Install"] = "npm install"
 	for key := range raw {
 		keyLower := strings.ToLower(key)
 		switch {
@@ -99,6 +100,5 @@ func normalizeNodeScripts(raw map[string]string) map[string]string {
 			s["Deploy"] = "npm run " + key
 		}
 	}
-	s["Install"] = "npm install"
 	return s
 }
